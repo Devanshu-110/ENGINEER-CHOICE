@@ -1,0 +1,160 @@
+// Fantasy Realm - App Implementation
+// This code demonstrates the core structure and key components of the Fantasy Realm app
+
+// App.js - Main application file
+import React, { useState, useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+import { Icon } from 'react-native-elements';
+
+// Screen imports
+import HomeScreen from './screens/HomeScreen';
+import ContestsScreen from './screens/ContestsScreen';
+import CreateTeamScreen from './screens/CreateTeamScreen';
+import WalletScreen from './screens/WalletScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import LoginScreen from './screens/LoginScreen';
+import SignupScreen from './screens/SignupScreen';
+import QuickGamesScreen from './screens/QuickGamesScreen';
+import MatchDetailsScreen from './screens/MatchDetailsScreen';
+import TeamPreviewScreen from './screens/TeamPreviewScreen';
+import ContestDetailsScreen from './screens/ContestDetailsScreen';
+import LeaderboardScreen from './screens/LeaderboardScreen';
+import KYCVerificationScreen from './screens/KYCVerificationScreen';
+import WithdrawScreen from './screens/WithdrawScreen';
+import AddMoneyScreen from './screens/AddMoneyScreen';
+
+const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+const AuthStack = createStackNavigator();
+
+// Authentication Navigator
+const AuthNavigator = () => (
+  <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Screen name="Login" component={LoginScreen} />
+    <AuthStack.Screen name="Signup" component={SignupScreen} />
+  </AuthStack.Navigator>
+);
+
+// Home Stack Navigator
+const HomeStackNavigator = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Fantasy Realm' }} />
+    <Stack.Screen name="MatchDetails" component={MatchDetailsScreen} />
+    <Stack.Screen name="CreateTeam" component={CreateTeamScreen} />
+    <Stack.Screen name="TeamPreview" component={TeamPreviewScreen} />
+    <Stack.Screen name="ContestDetails" component={ContestDetailsScreen} />
+    <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+    <Stack.Screen name="QuickGames" component={QuickGamesScreen} />
+  </Stack.Navigator>
+);
+
+// Contests Stack Navigator
+const ContestsStackNavigator = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="Contests" component={ContestsScreen} />
+    <Stack.Screen name="ContestDetails" component={ContestDetailsScreen} />
+    <Stack.Screen name="CreateTeam" component={CreateTeamScreen} />
+    <Stack.Screen name="TeamPreview" component={TeamPreviewScreen} />
+    <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+  </Stack.Navigator>
+);
+
+// Wallet Stack Navigator
+const WalletStackNavigator = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="Wallet" component={WalletScreen} />
+    <Stack.Screen name="AddMoney" component={AddMoneyScreen} />
+    <Stack.Screen name="Withdraw" component={WithdrawScreen} />
+    <Stack.Screen name="KYCVerification" component={KYCVerificationScreen} />
+  </Stack.Navigator>
+);
+
+// Profile Stack Navigator
+const ProfileStackNavigator = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="Profile" component={ProfileScreen} />
+    <Stack.Screen name="KYCVerification" component={KYCVerificationScreen} />
+  </Stack.Navigator>
+);
+
+// Main Tab Navigator
+const MainNavigator = () => (
+  <Tab.Navigator
+    screenOptions={({ route }) => ({
+      tabBarIcon: ({ focused, color, size }) => {
+        let iconName;
+        
+        if (route.name === 'HomeTab') {
+          iconName = 'home';
+        } else if (route.name === 'ContestsTab') {
+          iconName = 'trophy';
+        } else if (route.name === 'QuickGamesTab') {
+          iconName = 'gamepad';
+        } else if (route.name === 'WalletTab') {
+          iconName = 'wallet';
+        } else if (route.name === 'ProfileTab') {
+          iconName = 'user';
+        }
+        
+        return <Icon name={iconName} type="font-awesome-5" size={size} color={color} />;
+      },
+    })}
+  >
+    <Tab.Screen 
+      name="HomeTab" 
+      component={HomeStackNavigator} 
+      options={{ title: 'Home', headerShown: false }}
+    />
+    <Tab.Screen 
+      name="ContestsTab" 
+      component={ContestsStackNavigator} 
+      options={{ title: 'Contests', headerShown: false }}
+    />
+    <Tab.Screen 
+      name="QuickGamesTab" 
+      component={QuickGamesScreen} 
+      options={{ title: 'Quick Games' }}
+    />
+    <Tab.Screen 
+      name="WalletTab" 
+      component={WalletStackNavigator} 
+      options={{ title: 'Wallet', headerShown: false }}
+    />
+    <Tab.Screen 
+      name="ProfileTab" 
+      component={ProfileStackNavigator} 
+      options={{ title: 'Profile', headerShown: false }}
+    />
+  </Tab.Navigator>
+);
+
+// Main App Component
+const App = () => {
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState(null);
+  
+  // Handle user state changes
+  function onAuthStateChanged(user) {
+    setUser(user);
+    if (initializing) setInitializing(false);
+  }
+  
+  useEffect(() => {
+    const subscriber = auth().onAuthStateChanged(onAuthStateChanged);
+    return subscriber; // unsubscribe on unmount
+  }, []);
+  
+  if (initializing) return null;
+  
+  return (
+    <NavigationContainer>
+      {user ? <MainNavigator /> : <AuthNavigator />}
+    </NavigationContainer>
+  );
+};
+
+export default App;
