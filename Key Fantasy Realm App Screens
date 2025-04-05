@@ -1,0 +1,1282 @@
+// HomeScreen.js - Main app dashboard
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Image,
+  ScrollView
+} from 'react-native';
+import firestore from '@react-native-firebase/firestore';
+import { Card, Button, Icon } from 'react-native-elements';
+
+const HomeScreen = ({ navigation }) => {
+  const [upcomingMatches, setUpcomingMatches] = useState([]);
+  const [liveMatches, setLiveMatches] = useState([]);
+  const [featuredContests, setFeaturedContests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    // Fetch upcoming matches
+    const matchesSubscription = firestore()
+      .collection('matches')
+      .where('startTime', '>', new Date())
+      .orderBy('startTime', 'asc')
+      .limit(5)
+      .onSnapshot(snapshot => {
+        const matches = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setUpcomingMatches(matches);
+        setLoading(false);
+      });
+      
+    // Fetch live matches
+    const liveMatchesSubscription = firestore()
+      .collection('matches')
+      .where('status', '==', 'live')
+      .onSnapshot(snapshot => {
+        const matches = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setLiveMatches(matches);
+      });
+      
+    // Fetch featured contests
+    const contestsSubscription = firestore()
+      .collection('contests')
+      .where('featured', '==', true)
+      .limit(3)
+      .onSnapshot(snapshot => {
+        const contests = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setFeaturedContests(contests);
+      });
+    
+    return () => {
+      matchesSubscription();
+      liveMatchesSubscription();
+      contestsSubscription();
+    };
+  }, []);
+
+  // Render match card
+  const renderMatchCard = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.matchCard}
+      onPress={() => navigation.navigate('MatchDetails', { matchId: item.id })}
+    >
+      <View style={styles.matchHeader}>
+        <Text style={styles.leagueName}>{item.leagueName}</Text>
+        <Text style={styles.matchTime}>{new Date(item.startTime.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+      </View>
+      
+      <View style={styles.matchContent}>
+        <View style={styles.teamContainer}>
+          <Image source={{ uri: item.team1Logo }} style={styles.teamLogo} />
+          <Text style={styles.teamName}>{item.team1Name}</Text>
+        </View>
+        
+        <View style={styles.vsContainer}>
+          <Text style={styles.vsText}>VS</Text>
+        </View>
+        
+        <View style={styles.teamContainer}>
+          <Image source={{ uri: item.team2Logo }} style={styles.teamLogo} />
+          <Text style={styles.teamName}>{item.team2Name}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.contestInfo}>
+        <Text style={styles.prizePool}>₹{item.totalPrizePool.toLocaleString()}</Text>
+        <Button
+          title="Join Contest"
+          buttonStyle={styles.joinButton}
+          titleStyle={styles.joinButtonText}
+          onPress={() => navigation.navigate('ContestDetails', { matchId: item.id })}
+        />
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Render quick game card
+  const renderQuickGameCard = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.quickGameCard}
+      onPress={() => navigation.navigate('QuickGames', { gameId: item.id })}
+    >
+      <Image source={{ uri: item.thumbnail }} style={styles.gameThumbnail} />
+      <Text style={styles.gameName}>{item.name}</Text>
+      <Text style={styles.gameCategory}>{item.category}</Text>
+    </TouchableOpacity>
+  );
+
+  // Quick games data
+  const quickGames = [
+    { id: '1', name: 'Teen Patti', category: 'Card Game', thumbnail: 'https://example.com/teenpatti.jpg' },
+    { id: '2', name: 'Rummy', category: 'Card Game', thumbnail: 'https://example.com/rummy.jpg' },
+    { id: '3', name: 'Ludo', category: 'Board Game', thumbnail: 'https://example.com/ludo.jpg' },
+    { id: '4', name: 'Carrom', category: 'Board Game', thumbnail: 'https://example.com/carrom.jpg' },
+  ];
+
+  return (
+    <ScrollView style={styles.container}>
+      {/* Banner */}
+      <Card containerStyle={styles.bannerCard}>
+        <Image 
+          source={{ uri: 'https://example.com/promo-banner.jpg' }} 
+          style={styles.bannerImage}
+          resizeMode="cover"
+        />
+      </Card>
+      
+      {/* Live Matches */}
+      {liveMatches.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>LIVE MATCHES</Text>
+            <Icon name="circle" type="font-awesome" size={10} color="#ff0000" />
+          </View>
+          <FlatList
+            data={liveMatches}
+            renderItem={renderMatchCard}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          />
+        </View>
+      )}
+      
+      {/* Upcoming Matches */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>UPCOMING MATCHES</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('ContestsTab')}>
+            <Text style={styles.viewAll}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={upcomingMatches}
+          renderItem={renderMatchCard}
+          keyExtractor={item => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        />
+      </View>
+      
+      {/* Featured Contests */}
+      {featuredContests.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>FEATURED CONTESTS</Text>
+          </View>
+          {featuredContests.map(contest => (
+            <TouchableOpacity 
+              key={contest.id}
+              style={styles.featuredContestCard}
+              onPress={() => navigation.navigate('ContestDetails', { 
+                contestId: contest.id,
+                matchId: contest.matchId 
+              })}
+            >
+              <View style={styles.contestHeader}>
+                <Text style={styles.contestName}>{contest.name}</Text>
+                <View style={styles.prizeContainer}>
+                  <Icon name="trophy" type="font-awesome-5" size={14} color="#FFD700" />
+                  <Text style={styles.contestPrize}>₹{contest.prizePool.toLocaleString()}</Text>
+                </View>
+              </View>
+              <View style={styles.contestDetails}>
+                <View style={styles.contestDetail}>
+                  <Text style={styles.detailLabel}>Entry</Text>
+                  <Text style={styles.detailValue}>₹{contest.entryFee}</Text>
+                </View>
+                <View style={styles.contestDetail}>
+                  <Text style={styles.detailLabel}>Spots</Text>
+                  <Text style={styles.detailValue}>{contest.totalSpots}</Text>
+                </View>
+                <View style={styles.contestDetail}>
+                  <Text style={styles.detailLabel}>Filled</Text>
+                  <Text style={styles.detailValue}>{Math.round((contest.filledSpots / contest.totalSpots) * 100)}%</Text>
+                </View>
+              </View>
+              <Button
+                title="Join"
+                buttonStyle={styles.joinContestButton}
+                titleStyle={styles.joinButtonText}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      
+      {/* Quick Games */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>QUICK GAMES</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('QuickGamesTab')}>
+            <Text style={styles.viewAll}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={quickGames}
+          renderItem={renderQuickGameCard}
+          keyExtractor={item => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        />
+      </View>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  bannerCard: {
+    padding: 0,
+    margin: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  bannerImage: {
+    height: 150,
+    width: '100%',
+  },
+  section: {
+    marginVertical: 10,
+    paddingHorizontal: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  viewAll: {
+    color: '#3498db',
+    fontSize: 14,
+  },
+  matchCard: {
+    width: 280,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginRight: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  matchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  leagueName: {
+    fontSize: 12,
+    color: '#777',
+  },
+  matchTime: {
+    fontSize: 12,
+    color: '#777',
+  },
+  matchContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  teamContainer: {
+    alignItems: 'center',
+    width: '40%',
+  },
+  teamLogo: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
+  },
+  teamName: {
+    marginTop: 5,
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  vsContainer: {
+    width: '20%',
+    alignItems: 'center',
+  },
+  vsText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ff9900',
+  },
+  contestInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  prizePool: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#27ae60',
+  },
+  joinButton: {
+    backgroundColor: '#3498db',
+    borderRadius: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 15,
+  },
+  joinButtonText: {
+    fontSize: 12,
+  },
+  quickGameCard: {
+    width: 120,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 10,
+    marginRight: 10,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  gameThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  gameName: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  gameCategory: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
+  },
+  featuredContestCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  contestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  contestName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  prizeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  contestPrize: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f39c12',
+    marginLeft: 5,
+  },
+  contestDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  contestDetail: {
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#777',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  joinContestButton: {
+    backgroundColor: '#2ecc71',
+    borderRadius: 5,
+  },
+});
+
+export default HomeScreen;
+
+// CreateTeamScreen.js - Team creation interface
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Alert
+} from 'react-native';
+import { Button, SearchBar, CheckBox } from 'react-native-elements';
+import firestore from '@react-native-firebase/firestore';
+
+const CreateTeamScreen = ({ route, navigation }) => {
+  const { matchId, contestId } = route.params;
+  const [match, setMatch] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const [credits, setCredits] = useState(100);
+  const [tab, setTab] = useState('WK'); // WK, BAT, AR, BOWL
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  
+  // Team composition rules
+  const maxPlayers = 11;
+  const maxPerTeam = 7;
+  const requiredComposition = {
+    WK: { min: 1, max: 4 },
+    BAT: { min: 3, max: 6 },
+    AR: { min: 1, max: 4 },
+    BOWL: { min: 3, max: 6 }
+  };
+  
+  useEffect(() => {
+    // Fetch match details
+    const fetchMatch = async () => {
+      try {
+        const matchDoc = await firestore().collection('matches').doc(matchId).get();
+        if (matchDoc.exists) {
+          setMatch(matchDoc.data());
+        }
+      } catch (error) {
+        console.error('Error fetching match:', error);
+      }
+    };
+    
+    // Fetch players
+    const fetchPlayers = async () => {
+      try {
+        const playersSnapshot = await firestore()
+          .collection('players')
+          .where('matchId', '==', matchId)
+          .get();
+          
+        const playersData = playersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          selected: false
+        }));
+        
+        setPlayers(playersData);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching players:', error);
+        setLoading(false);
+      }
+    };
+    
+    fetchMatch();
+    fetchPlayers();
+  }, [matchId]);
+
+  // Filter players based on role and search
+  const filteredPlayers = players.filter(player => {
+    return player.role === tab && 
+           (search === '' || 
+            player.name.toLowerCase().includes(search.toLowerCase()));
+  });
+  
+  // Count selected players by role
+  const countByRole = role => {
+    return selectedPlayers.filter(p => p.role === role).length;
+  };
+  
+  // Count selected players by team
+  const countByTeam = team => {
+    return selectedPlayers.filter(p => p.team === team).length;
+  };
+  
+  // Calculate used credits
+  const usedCredits = selectedPlayers.reduce((sum, player) => sum + player.credits, 0);
+  
+  // Toggle player selection
+  const togglePlayerSelection = (player) => {
+    const isSelected = selectedPlayers.some(p => p.id === player.id);
+    
+    if (isSelected) {
+      // Deselect player
+      setSelectedPlayers(selectedPlayers.filter(p => p.id !== player.id));
+      return;
+    }
+    
+    // Validations for selection
+    if (selectedPlayers.length >= maxPlayers) {
+      Alert.alert('Team Full', 'You cannot select more than 11 players.');
+      return;
+    }
+    
+    if (usedCredits + player.credits > 100) {
+      Alert.alert('Credit Limit Exceeded', 'You do not have enough credits.');
+      return;
+    }
+    
+    const roleCount = countByRole(player.role);
+    if (roleCount >= requiredComposition[player.role].max) {
+      Alert.alert('Role Limit Exceeded', `You cannot select more than ${requiredComposition[player.role].max} ${player.role} players.`);
+      return;
+    }
+    
+    const teamCount = countByTeam(player.team);
+    if (teamCount >= maxPerTeam) {
+      Alert.alert('Team Limit Exceeded', 'You cannot select more than 7 players from the same team.');
+      return;
+    }
+    
+    // Select player
+    setSelectedPlayers([...selectedPlayers, player]);
+  };
+  
+  // Render player item
+  const renderPlayerItem = ({ item }) => {
+    const isSelected = selectedPlayers.some(p => p.id === item.id);
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.playerCard, isSelected && styles.selectedPlayerCard]}
+        onPress={() => togglePlayerSelection(item)}
+      >
+        <View style={styles.playerInfo}>
+          <Image source={{ uri: item.image }} style={styles.playerImage} />
+          <View style={styles.playerDetails}>
+            <Text style={styles.playerName}>{item.name}</Text>
+            <Text style={styles.playerTeam}>{item.team}</Text>
+            <Text style={styles.playerPoints}>Avg: {item.averagePoints} pts</Text>
+          </View>
+        </View>
+        <View style={styles.playerCredits}>
+          <Text style={styles.creditsValue}>{item.credits}</Text>
+          <CheckBox
+            checked={isSelected}
+            onPress={() => togglePlayerSelection(item)}
+            checkedColor="#3498db"
+            containerStyle={styles.checkbox}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Proceed to captain selection
+  const proceedToCaptainSelection = () => {
+    // Validate team composition
+    for (const role in requiredComposition) {
+      const count = countByRole(role);
+      if (count < requiredComposition[role].min) {
+        Alert.alert(
+          'Invalid Team Composition',
+          `You must select at least ${requiredComposition[role].min} ${role} players.`
+        );
+        return;
+      }
+    }
+    
+    if (selectedPlayers.length < maxPlayers) {
+      Alert.alert(
+        'Incomplete Team',
+        `You must select exactly ${maxPlayers} players.`
+      );
+      return;
+    }
+    
+    // Navigate to captain selection
+    navigation.navigate('TeamPreview', {
+      selectedPlayers,
+      matchId,
+      contestId
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading players...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Match Info */}
+      {match && (
+        <View style={styles.matchInfo}>
+          <Text style={styles.matchTitle}>{match.team1Name} vs {match.team2Name}</Text>
+          <Text style={styles.matchTime}>
+            {new Date(match.startTime.toDate()).toLocaleDateString()}
+          </Text>
+        </View>
+      )}
+      
+      {/* Selection Status */}
+      <View style={styles.selectionStatus}>
+        <View style={styles.statusItems}>
+          <View style={styles.statusItem}>
+            <Text style={styles.statusLabel}>Players</Text>
+            <Text style={styles.statusValue}>{selectedPlayers.length}/{maxPlayers}</Text>
+          </View>
+          
+          <View style={styles.statusItem}>
+            <Text style={styles.statusLabel}>Credits</Text>
+            <Text style={styles.statusValue}>{(100 - usedCredits).toFixed(1)}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.teamComposition}>
+          {Object.keys(requiredComposition).map(role => (
+            <View key={role} style={styles.roleCount}>
+              <Text style={styles.roleLabel}>{role}</Text>
+              <Text style={styles.roleValue}>
+                {countByRole(role)}/{requiredComposition[role].max}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      
+      {/* Role Tabs */}
+      <View style={styles.roleTabs}>
+        {Object.keys(requiredComposition).map(role => (
+          <TouchableOpacity
+            key={role}
+            style={[styles.roleTab, role === tab && styles.activeRoleTab]}
+            onPress={() => setTab(role)}
+          >
+            <Text style={[styles.roleTabText, role === tab && styles.activeRoleTabText]}>
+              {role}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
+      {/* Search Bar */}
+      <SearchBar
+        placeholder="Search players..."
+        onChangeText={setSearch}
+        value={search}
+        containerStyle={styles.searchContainer}
+        inputContainerStyle={styles.searchInputContainer}
+        lightTheme
+      />
+      
+      {/* Players List */}
+      <FlatList
+        data={filteredPlayers}
+        renderItem={renderPlayerItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.playersList}
+      />
+      
+      {/* Continue Button */}
+      <View style={styles.buttonContainer}>
+        <Button
+          title="CONTINUE"
+          buttonStyle={styles.continueButton}
+          onPress={proceedToCaptainSelection}
+          disabled={selectedPlayers.length < maxPlayers}
+        />
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  matchInfo: {
+    backgroundColor: '#3498db',
+    padding: 15,
+    alignItems: 'center',
+  },
+  matchTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bol
+matchTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  matchTime: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  selectionStatus: {
+    backgroundColor: '#fff',
+    padding: 10,
+    marginBottom: 5,
+  },
+  statusItems: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  statusItem: {
+    alignItems: 'center',
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#777',
+  },
+  statusValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  teamComposition: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  roleCount: {
+    alignItems: 'center',
+  },
+  roleLabel: {
+    fontSize: 12,
+    color: '#777',
+  },
+  roleValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  roleTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginBottom: 5,
+  },
+  roleTab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeRoleTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#3498db',
+  },
+  roleTabText: {
+    fontSize: 14,
+    color: '#777',
+  },
+  activeRoleTabText: {
+    color: '#3498db',
+    fontWeight: 'bold',
+  },
+  searchContainer: {
+    backgroundColor: '#fff',
+    borderTopWidth: 0,
+    borderBottomWidth: 0,
+    paddingHorizontal: 10,
+    marginBottom: 5,
+  },
+  searchInputContainer: {
+    backgroundColor: '#f5f5f5',
+    height: 36,
+  },
+  playersList: {
+    paddingHorizontal: 10,
+    paddingTop: 5,
+    paddingBottom: 80,
+  },
+  playerCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedPlayerCard: {
+    backgroundColor: '#e3f2fd',
+  },
+  playerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  playerImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#eee',
+  },
+  playerDetails: {
+    marginLeft: 12,
+  },
+  playerName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  playerTeam: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  playerPoints: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
+  },
+  playerCredits: {
+    alignItems: 'center',
+  },
+  creditsValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2ecc71',
+  },
+  checkbox: {
+    padding: 0,
+    margin: 0,
+    marginTop: 5,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    padding: 15,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  continueButton: {
+    backgroundColor: '#3498db',
+    borderRadius: 5,
+    paddingVertical: 12,
+  },
+});
+
+// WalletScreen.js - User wallet and transaction history
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Alert 
+} from 'react-native';
+import { Card, Button, Icon, Divider } from 'react-native-elements';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+
+const WalletScreen = ({ navigation }) => {
+  const [walletData, setWalletData] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const userId = auth().currentUser.uid;
+    
+    // Fetch wallet data
+    const walletSubscription = firestore()
+      .collection('wallets')
+      .doc(userId)
+      .onSnapshot(snapshot => {
+        if (snapshot.exists) {
+          setWalletData(snapshot.data());
+        } else {
+          // Create a new wallet if it doesn't exist
+          firestore().collection('wallets').doc(userId).set({
+            balance: 0,
+            bonus: 0,
+            winnings: 0,
+            deposited: 0,
+            kycVerified: false,
+            createdAt: firestore.FieldValue.serverTimestamp()
+          });
+        }
+        setLoading(false);
+      });
+      
+    // Fetch recent transactions
+    const transactionsSubscription = firestore()
+      .collection('transactions')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .limit(20)
+      .onSnapshot(snapshot => {
+        const transactionData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setTransactions(transactionData);
+      });
+    
+    return () => {
+      walletSubscription();
+      transactionsSubscription();
+    };
+  }, []);
+
+  // Add money to wallet
+  const handleAddMoney = () => {
+    navigation.navigate('AddMoney');
+  };
+  
+  // Withdraw money from wallet
+  const handleWithdraw = () => {
+    if (!walletData.kycVerified) {
+      Alert.alert(
+        'KYC Required',
+        'You need to complete KYC verification before withdrawing money.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Verify KYC', onPress: () => navigation.navigate('KYCVerification') }
+        ]
+      );
+      return;
+    }
+    
+    if (walletData.winnings <= 0) {
+      Alert.alert('Insufficient Balance', 'You do not have any winnings to withdraw.');
+      return;
+    }
+    
+    navigation.navigate('Withdraw');
+  };
+  
+  // Render transaction item
+  const renderTransactionItem = ({ item }) => {
+    let iconName, iconColor, amountColor;
+    
+    switch (item.type) {
+      case 'deposit':
+        iconName = 'arrow-down';
+        iconColor = '#2ecc71';
+        amountColor = '#2ecc71';
+        break;
+      case 'withdrawal':
+        iconName = 'arrow-up';
+        iconColor = '#e74c3c';
+        amountColor = '#e74c3c';
+        break;
+      case 'contest-join':
+        iconName = 'gamepad';
+        iconColor = '#3498db';
+        amountColor = '#e74c3c';
+        break;
+      case 'win':
+        iconName = 'trophy';
+        iconColor = '#f39c12';
+        amountColor = '#2ecc71';
+        break;
+      default:
+        iconName = 'exchange-alt';
+        iconColor = '#95a5a6';
+        amountColor = '#333';
+    }
+    
+    return (
+      <View style={styles.transactionItem}>
+        <View style={styles.transactionIcon}>
+          <Icon 
+            name={iconName} 
+            type="font-awesome-5" 
+            color={iconColor} 
+            size={16} 
+            containerStyle={styles.iconContainer}
+          />
+        </View>
+        
+        <View style={styles.transactionDetails}>
+          <Text style={styles.transactionTitle}>{item.description}</Text>
+          <Text style={styles.transactionTime}>
+            {new Date(item.timestamp.toDate()).toLocaleString()}
+          </Text>
+        </View>
+        
+        <Text style={[styles.transactionAmount, { color: amountColor }]}>
+          {item.type === 'withdrawal' || item.type === 'contest-join' ? '-' : '+'}
+          ₹{item.amount.toFixed(2)}
+        </Text>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading wallet...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Balance Card */}
+      <Card containerStyle={styles.balanceCard}>
+        <Text style={styles.balanceTitle}>Total Balance</Text>
+        <Text style={styles.balanceAmount}>
+          ₹{walletData ? (walletData.balance).toFixed(2) : '0.00'}
+        </Text>
+        
+        <View style={styles.balanceDetails}>
+          <View style={styles.balanceItem}>
+            <Text style={styles.balanceLabel}>Deposited</Text>
+            <Text style={styles.balanceValue}>₹{walletData.deposited.toFixed(2)}</Text>
+          </View>
+          
+          <View style={styles.balanceItem}>
+            <Text style={styles.balanceLabel}>Winnings</Text>
+            <Text style={styles.balanceValue}>₹{walletData.winnings.toFixed(2)}</Text>
+          </View>
+          
+          <View style={styles.balanceItem}>
+            <Text style={styles.balanceLabel}>Bonus</Text>
+            <Text style={styles.balanceValue}>₹{walletData.bonus.toFixed(2)}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.walletActions}>
+          <Button
+            title="ADD MONEY"
+            icon={<Icon name="plus" type="font-awesome-5" size={14} color="#fff" />}
+            buttonStyle={[styles.walletButton, styles.addMoneyButton]}
+            titleStyle={styles.walletButtonText}
+            onPress={handleAddMoney}
+          />
+          
+          <Button
+            title="WITHDRAW"
+            icon={<Icon name="wallet" type="font-awesome-5" size={14} color="#fff" />}
+            buttonStyle={[styles.walletButton, styles.withdrawButton]}
+            titleStyle={styles.walletButtonText}
+            onPress={handleWithdraw}
+          />
+        </View>
+      </Card>
+      
+      {/* KYC Banner */}
+      {!walletData.kycVerified && (
+        <TouchableOpacity 
+          style={styles.kycBanner}
+          onPress={() => navigation.navigate('KYCVerification')}
+        >
+          <Icon name="exclamation-circle" type="font-awesome-5" color="#fff" size={20} />
+          <Text style={styles.kycText}>Complete KYC verification to withdraw winnings</Text>
+          <Icon name="chevron-right" type="font-awesome-5" color="#fff" size={16} />
+        </TouchableOpacity>
+      )}
+      
+      {/* Transactions */}
+      <View style={styles.transactionsContainer}>
+        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+        
+        {transactions.length === 0 ? (
+          <View style={styles.emptyTransactions}>
+            <Icon name="history" type="font-awesome-5" size={40} color="#ccc" />
+            <Text style={styles.emptyText}>No transaction history yet</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={transactions}
+            renderItem={renderTransactionItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.transactionsList}
+            ItemSeparatorComponent={() => <Divider style={styles.divider} />}
+          />
+        )}
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  balanceCard: {
+    borderRadius: 10,
+    padding: 15,
+    margin: 15,
+  },
+  balanceTitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  balanceAmount: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 5,
+    marginBottom: 15,
+  },
+  balanceDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  balanceItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  balanceLabel: {
+    fontSize: 12,
+    color: '#777',
+  },
+  balanceValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
+  walletActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  walletButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  addMoneyButton: {
+    backgroundColor: '#2ecc71',
+  },
+  withdrawButton: {
+    backgroundColor: '#3498db',
+  },
+  walletButtonText: {
+    fontSize: 14,
+    marginLeft: 5,
+  },
+  kycBanner: {
+    backgroundColor: '#e74c3c',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginHorizontal: 15,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  kycText: {
+    color: '#fff',
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 13,
+  },
+  transactionsContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 15,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  emptyTransactions: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    marginTop: 15,
+    color: '#999',
+    fontSize: 16,
+  },
+  transactionsList: {
+    paddingBottom: 20,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  transactionIcon: {
+    marginRight: 15,
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  transactionTime: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 3,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  divider: {
+    backgroundColor: '#eee',
+  },
+});
+
+export default WalletScreen;
